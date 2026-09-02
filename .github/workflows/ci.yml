@@ -22,3 +22,4 @@ jobs:
       - run: uv sync --all-groups
       - run: uv run ruff check .
       - run: uv run pytest -m "not acceptance"
+      - run: docker build --tag cheq-churn-mcp:ci .
