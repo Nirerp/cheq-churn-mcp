@@ -29,6 +29,9 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = [
+    "acceptance: validates MCP behavior against the ignored, bootstrapped full dataset",
+]
 
 [tool.ruff]
 line-length = 100

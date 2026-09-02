@@ -9,6 +9,9 @@ import pytest
 
 from cheq_churn_mcp.data.contract import COLUMN_ALIASES
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FULL_SNAPSHOT_PATH = PROJECT_ROOT / "data" / "telco_customer_churn.csv"
+
 
 @pytest.fixture
 def customer_csv(tmp_path: Path) -> Path:
@@ -68,3 +71,13 @@ def customer_csv(tmp_path: Path) -> Path:
         writer.writeheader()
         writer.writerows(rows)
     return path
+
+
+@pytest.fixture(scope="session")
+def full_snapshot_path() -> Path:
+    """Return the ignored full snapshot or skip acceptance tests with useful guidance."""
+    if not FULL_SNAPSHOT_PATH.is_file():
+        pytest.skip(
+            "Full-dataset acceptance tests require `uv run python scripts/bootstrap_data.py`."
+        )
+    return FULL_SNAPSHOT_PATH
