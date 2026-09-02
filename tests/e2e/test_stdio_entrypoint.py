@@ -29,6 +29,30 @@ async def test_console_entrypoint_serves_mcp_tools_over_stdio(customer_csv: Path
         "analyze_customers",
         "data_quality_summary",
         "describe_dataset",
-        "get_customer_snapshot",
     }
     assert result.data["customer_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_console_entrypoint_exposes_snapshots_only_in_trusted_demo_mode(
+    customer_csv: Path,
+) -> None:
+    transport = StdioTransport(
+        command="uv",
+        args=["run", "cheq-churn-mcp"],
+        cwd=str(PROJECT_ROOT),
+        env={
+            **os.environ,
+            "CHEQ_DATASET_PATH": str(customer_csv),
+            "CHEQ_ENABLE_SNAPSHOT_LOOKUPS": "1",
+        },
+    )
+
+    async with Client(transport) as client:
+        tools = await client.list_tools()
+        result = await client.call_tool(
+            "get_customer_snapshot", {"customer_id": "0001-AAAAA"}
+        )
+
+    assert "get_customer_snapshot" in {tool.name for tool in tools}
+    assert "customer_id" not in result.data["customer"]

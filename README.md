@@ -11,8 +11,10 @@ customer snapshot with controlled churn-reason labels, not a text corpus.
 
 - `describe_dataset` — source provenance, supported fields, and limitations.
 - `analyze_customers` — allowlisted aggregate metrics, filters, and dimensions.
-- `get_customer_snapshot` — single-customer lookup with a narrow safe projection.
 - `data_quality_summary` — uniqueness and core completeness checks.
+
+The default server is aggregate-only. It intentionally does not expose any
+customer lookup or ID-discovery tool.
 
 Every aggregate result includes the pinned Hugging Face dataset revision and
 the applied filter definition. Grouped aggregates suppress groups below five
@@ -25,7 +27,8 @@ dimensions, filters, and operators into parameterized DuckDB queries.
 
 - A mistyped metric, unsupported grouping, malformed customer ID, or conflicting
   filter returns an actionable `INVALID_ARGUMENT` tool error.
-- A valid customer lookup with no matching record returns `NOT_FOUND`.
+- In trusted-demo mode, a valid customer lookup with no matching record returns
+  `NOT_FOUND`.
 - An empty aggregate result is valid data, returned as an empty `rows` list.
 - Unexpected server failures are masked from the MCP client; they are recorded
   as privacy-safe audit events without customer IDs, filter values, or raw
@@ -48,6 +51,17 @@ then starts the stdio MCP process:
 ```bash
 make demo
 ```
+
+For a controlled local demonstration of a known-ID snapshot, use the explicit
+trusted-demo mode instead:
+
+```bash
+make demo-trusted
+```
+
+This exposes `get_customer_snapshot` only for an ID the caller already knows;
+the response excludes that identifier and direct identifier discovery remains
+unsupported. It is a local demo switch, not authentication or RBAC.
 
 Run the MCP server over stdio:
 
@@ -111,8 +125,8 @@ tool; it must not generate arbitrary SQL.
   `metric="churn_rate"` and `group_by=["contract"]`
 - “How many churned customers said they don't know why?” → `analyze_customers`
   with `metric="churned_customers"` and `filters={"reason_intent": "unclear_reason"}`
-- “Show the operational churn snapshot for customer `0002-ORFBO`.” →
-  `get_customer_snapshot(customer_id="0002-ORFBO")`
+- In trusted-demo mode only: “Show the operational churn snapshot for known
+  customer `0002-ORFBO`.” → `get_customer_snapshot(customer_id="0002-ORFBO")`
 
 ## Verify
 

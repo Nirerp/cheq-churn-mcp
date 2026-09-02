@@ -16,7 +16,7 @@ def test_snapshot_omits_precise_location_and_payment_data(customer_csv: Path) ->
     )
 
     assert response.customer is not None
-    assert response.customer["customer_id"] == "0001-AAAAA"
+    assert "customer_id" not in response.customer
     assert "payment_method" not in response.customer
     assert "age" not in response.customer
     repository.close()

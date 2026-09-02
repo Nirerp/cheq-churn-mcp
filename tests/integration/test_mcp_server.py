@@ -15,7 +15,7 @@ from cheq_churn_mcp.server import create_server
 async def test_server_exposes_typed_tools_and_returns_structured_content(
     customer_csv: Path,
 ) -> None:
-    async with Client(create_server(customer_csv)) as client:
+    async with Client(create_server(customer_csv, enable_customer_snapshots=True)) as client:
         tools = await client.list_tools()
         result = await client.call_tool(
             "analyze_customers",
@@ -33,8 +33,20 @@ async def test_server_exposes_typed_tools_and_returns_structured_content(
 
 
 @pytest.mark.asyncio
-async def test_server_returns_safe_actionable_errors(customer_csv: Path) -> None:
+async def test_server_defaults_to_aggregate_only_tools(customer_csv: Path) -> None:
     async with Client(create_server(customer_csv)) as client:
+        tools = await client.list_tools()
+
+    assert {tool.name for tool in tools} == {
+        "analyze_customers",
+        "data_quality_summary",
+        "describe_dataset",
+    }
+
+
+@pytest.mark.asyncio
+async def test_server_returns_safe_actionable_errors(customer_csv: Path) -> None:
+    async with Client(create_server(customer_csv, enable_customer_snapshots=True)) as client:
         with pytest.raises(ToolError, match="INVALID_ARGUMENT"):
             await client.call_tool("analyze_customers", {"metric": "freeform_sql"})
         with pytest.raises(ToolError, match="NOT_FOUND"):

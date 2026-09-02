@@ -1,4 +1,4 @@
-.PHONY: bootstrap check demo print-mcp-config install-codex remove-codex install-claude-code remove-claude-code
+.PHONY: bootstrap check demo demo-trusted print-mcp-config install-codex remove-codex install-claude-code remove-claude-code
 
 MCP_NAME := cheq-churn
 PROJECT_ROOT := $(shell pwd -P)
@@ -12,6 +12,9 @@ check:
 
 demo: bootstrap check
 	uv run cheq-churn-mcp
+
+demo-trusted: bootstrap check
+	CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
 
 print-mcp-config:
 	@printf '%s\n' '[mcp_servers.$(MCP_NAME)]' 'command = "uv"' \

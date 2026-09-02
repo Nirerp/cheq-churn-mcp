@@ -11,8 +11,8 @@ from fastmcp.exceptions import ToolError
 from cheq_churn_mcp.server import create_server
 
 
-def _server(snapshot_path: Path):
-    return create_server(snapshot_path)
+def _server(snapshot_path: Path, *, enable_customer_snapshots: bool = False):
+    return create_server(snapshot_path, enable_customer_snapshots=enable_customer_snapshots)
 
 
 @pytest.mark.acceptance
@@ -71,7 +71,7 @@ async def test_churn_rate_grouped_by_contract_matches_known_results(
 @pytest.mark.acceptance
 @pytest.mark.asyncio
 async def test_unclear_reason_intent_matches_the_source_label(full_snapshot_path: Path) -> None:
-    async with Client(_server(full_snapshot_path)) as client:
+    async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
         result = await client.call_tool(
             "analyze_customers",
             {
@@ -86,13 +86,13 @@ async def test_unclear_reason_intent_matches_the_source_label(full_snapshot_path
 @pytest.mark.acceptance
 @pytest.mark.asyncio
 async def test_snapshot_is_limited_to_the_safe_field_projection(full_snapshot_path: Path) -> None:
-    async with Client(_server(full_snapshot_path)) as client:
+    async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
         result = await client.call_tool(
             "get_customer_snapshot", {"customer_id": "0002-ORFBO"}
         )
 
     customer = result.data["customer"]
-    assert customer["customer_id"] == "0002-ORFBO"
+    assert "customer_id" not in customer
     assert "payment_method" not in customer
     assert "age" not in customer
     assert "zip_code" not in customer
