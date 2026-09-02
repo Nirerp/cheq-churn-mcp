@@ -51,17 +51,40 @@ on each machine before the server starts.
 
 ### Codex
 
-Copy the table in [`examples/codex.config.toml`](examples/codex.config.toml)
-into `~/.codex/config.toml`, or into `.codex/config.toml` for a trusted clone.
-Replace `/ABSOLUTE/PATH/TO/cheq-churn-mcp` with the clone's absolute path, then
-restart Codex. Codex supports local stdio servers in `config.toml` through an
-`[mcp_servers.<name>]` table.
+Install the server for the current clone with:
 
-### Claude Desktop
+```bash
+make install-codex
+```
 
-Merge [`examples/claude_desktop_config.json`](examples/claude_desktop_config.json)
-into the Claude Desktop MCP configuration and replace the placeholder absolute
-path. Restart Claude Desktop after saving.
+It refuses to overwrite an existing `cheq-churn` configuration. To inspect the
+registered server, run `codex mcp get cheq-churn`; restart Codex afterward.
+Alternatively, `make print-mcp-config` prints a ready-to-paste table with this
+clone's absolute path. Codex supports local stdio servers in `config.toml`
+through an `[mcp_servers.<name>]` table.
+
+When the demo is over, remove only this server entry with:
+
+```bash
+make remove-codex
+```
+
+### Claude Code
+
+With the Claude Code CLI installed, register the same local server with:
+
+```bash
+make install-claude-code
+```
+
+This uses Claude Code's `claude mcp add` command. `make print-mcp-config` also
+prints a JSON entry that can be adapted for other MCP clients.
+
+Remove the same server later with:
+
+```bash
+make remove-claude-code
+```
 
 ## Example business prompts
 
