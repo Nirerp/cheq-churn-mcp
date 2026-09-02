@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,22 +56,23 @@ def bootstrap_dataset(data_dir: Path, *, overwrite: bool = False) -> BootstrapRe
     if not customers["Customer ID"].is_unique:
         raise ValueError("Dataset contract violation: Customer ID values are not unique.")
 
-    data_dir.mkdir(parents=True, exist_ok=True)
-    customers.to_csv(dataset_path, index=False)
-    metadata_path.write_text(
-        json.dumps(
-            {
-                "dataset_id": DATASET_ID,
-                "revision": DATASET_REVISION,
-                "splits": list(DATASET_SPLITS),
-                "row_count": len(customers),
-                "column_count": len(customers.columns),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(data_dir, 0o700)
+    _write_atomically(
+        dataset_path,
+        lambda path: customers.to_csv(path, index=False),
     )
+    metadata = json.dumps(
+        {
+            "dataset_id": DATASET_ID,
+            "revision": DATASET_REVISION,
+            "splits": list(DATASET_SPLITS),
+            "row_count": len(customers),
+            "column_count": len(customers.columns),
+        },
+        indent=2,
+    ) + "\n"
+    _write_atomically(metadata_path, lambda path: path.write_text(metadata, encoding="utf-8"))
 
     return BootstrapResult(
         dataset_path=dataset_path,
@@ -76,3 +80,23 @@ def bootstrap_dataset(data_dir: Path, *, overwrite: bool = False) -> BootstrapRe
         row_count=len(customers),
         column_count=len(customers.columns),
     )
+
+
+def _write_atomically(destination: Path, write: Callable[[Path], None]) -> None:
+    """Write one owner-only cache file without exposing partial data on interruption."""
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=destination.parent,
+        prefix=f".{destination.name}.",
+        suffix=".tmp",
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        try:
+            os.fchmod(descriptor, 0o600)
+        finally:
+            os.close(descriptor)
+        write(temporary_path)
+        temporary_path.replace(destination)
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
