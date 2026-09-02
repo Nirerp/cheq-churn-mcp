@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "cheq-churn": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/ABSOLUTE/PATH/TO/cheq-churn-mcp",
+        "cheq-churn-mcp"
+      ]
+    }
+  }
+}

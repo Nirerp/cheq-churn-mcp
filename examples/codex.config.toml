@@ -1,0 +1,6 @@
+# Copy this table into ~/.codex/config.toml or a trusted project's
+# .codex/config.toml, then replace /ABSOLUTE/PATH/TO/cheq-churn-mcp.
+
+[mcp_servers.cheq-churn]
+command = "uv"
+args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]

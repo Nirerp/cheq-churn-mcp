@@ -27,6 +27,13 @@ redistribution terms, materialize the pinned source into the ignored local cache
 uv run python scripts/bootstrap_data.py
 ```
 
+Or use the complete local demo path; it bootstraps the source, runs validation,
+then starts the stdio MCP process:
+
+```bash
+make demo
+```
+
 Run the MCP server over stdio:
 
 ```bash
@@ -35,6 +42,39 @@ uv run cheq-churn-mcp
 
 For a different local snapshot, set `CHEQ_DATASET_PATH` to its CSV path. The
 server writes protocol messages to stdout; diagnostics go to stderr.
+
+## Connect an MCP client
+
+First clone the repository and run `uv sync --all-groups`. The data bootstrap
+is deliberately local: the dataset is ignored by Git and must be materialized
+on each machine before the server starts.
+
+### Codex
+
+Copy the table in [`examples/codex.config.toml`](examples/codex.config.toml)
+into `~/.codex/config.toml`, or into `.codex/config.toml` for a trusted clone.
+Replace `/ABSOLUTE/PATH/TO/cheq-churn-mcp` with the clone's absolute path, then
+restart Codex. Codex supports local stdio servers in `config.toml` through an
+`[mcp_servers.<name>]` table.
+
+### Claude Desktop
+
+Merge [`examples/claude_desktop_config.json`](examples/claude_desktop_config.json)
+into the Claude Desktop MCP configuration and replace the placeholder absolute
+path. Restart Claude Desktop after saving.
+
+## Example business prompts
+
+These are natural-language prompts for the MCP host. The host should select a
+tool; it must not generate arbitrary SQL.
+
+- “What percentage of customers churned?” → `analyze_customers(metric="churn_rate")`
+- “Which contract has the highest churn rate?” → `analyze_customers` with
+  `metric="churn_rate"` and `group_by=["contract"]`
+- “How many churned customers said they don't know why?” → `analyze_customers`
+  with `metric="churned_customers"` and `filters={"reason_intent": "unclear_reason"}`
+- “Show the operational churn snapshot for customer `0002-ORFBO`.” →
+  `get_customer_snapshot(customer_id="0002-ORFBO")`
 
 ## Verify
 
