@@ -21,6 +21,8 @@ class CompiledAnalyticsQuery:
 
     sql: str
     parameters: tuple[Any, ...]
+    suppression_sql: str | None = None
+    suppression_parameters: tuple[Any, ...] = ()
 
 
 def _where_clause(filters: CustomerFilters) -> tuple[str, list[Any]]:
@@ -73,14 +75,28 @@ def compile_analytics_query(request: AnalyzeCustomersRequest) -> CompiledAnalyti
         f"{metric.expression} AS value",
     ]
     sql = f"SELECT {', '.join(select_parts)} FROM {CUSTOMER_TABLE} WHERE {where_sql}"
+    suppression_sql: str | None = None
+    suppression_parameters: tuple[Any, ...] = ()
     if group_columns:
         group_sql = ", ".join(group_columns)
         sql += f" GROUP BY {group_sql} HAVING COUNT(*) >= ?"
         parameters.append(MINIMUM_AGGREGATE_GROUP_SIZE)
         sql += f" ORDER BY value DESC NULLS LAST, {group_sql} ASC"
+        suppression_sql = (
+            "SELECT COUNT(*) AS suppressed_group_count FROM ("
+            f"SELECT 1 FROM {CUSTOMER_TABLE} WHERE {where_sql} "
+            f"GROUP BY {group_sql} HAVING COUNT(*) < ?"
+            ") AS suppressed_groups"
+        )
+        suppression_parameters = tuple([*parameters[:-1], MINIMUM_AGGREGATE_GROUP_SIZE])
     sql += " LIMIT ?"
     parameters.append(request.limit)
-    return CompiledAnalyticsQuery(sql=sql, parameters=tuple(parameters))
+    return CompiledAnalyticsQuery(
+        sql=sql,
+        parameters=tuple(parameters),
+        suppression_sql=suppression_sql,
+        suppression_parameters=suppression_parameters,
+    )
 
 
 class AnalyticsService:
@@ -93,6 +109,12 @@ class AnalyticsService:
         """Run an allowlisted aggregation over the locally materialized snapshot."""
         compiled = compile_analytics_query(request)
         rows = self._repository.fetch_all(compiled.sql, compiled.parameters)
+        suppressed_group_count = 0
+        if compiled.suppression_sql is not None:
+            suppression = self._repository.fetch_one(
+                compiled.suppression_sql, compiled.suppression_parameters
+            )
+            suppressed_group_count = int(suppression["suppressed_group_count"])
         return AnalyticsResponse(
             rows=rows,
             provenance=Provenance(
@@ -101,4 +123,5 @@ class AnalyticsService:
                 metric_definition=METRICS[request.metric].definition,
                 filters_applied=request.filters.model_dump(exclude_none=True),
             ),
+            suppressed_group_count=suppressed_group_count,
         )

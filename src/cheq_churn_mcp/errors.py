@@ -11,3 +11,7 @@ class DatasetUnavailableError(ChurnMcpError):
 
 class DatasetContractError(ChurnMcpError):
     """The local snapshot cannot support the documented analytic contract."""
+
+
+class CustomerNotFoundError(ChurnMcpError):
+    """A single-customer lookup did not match a record in the local snapshot."""
