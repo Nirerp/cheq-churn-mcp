@@ -138,3 +138,19 @@ uv run pytest
 
 The assignment PDF, datasets/spreadsheets, and working design documents are
 intentionally local-only and excluded by `.gitignore`.
+
+## Docker
+
+The image deliberately excludes the local dataset. Build it, then mount the
+ignored local cache read-only when running the stdio server:
+
+```bash
+docker build --tag cheq-churn-mcp:local .
+docker run -i --rm -v "$(pwd)/data:/app/data:ro" cheq-churn-mcp:local
+```
+
+To use a dataset mounted elsewhere in the container, set
+`CHEQ_DATASET_PATH` to its in-container CSV path. The bootstrap stores newly
+materialized data and metadata owner-only and writes them atomically. If you
+bootstrapped this repository before that protection existed, rerun
+`uv run python scripts/bootstrap_data.py --overwrite` once.

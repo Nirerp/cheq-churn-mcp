@@ -16,7 +16,7 @@ data/*
 *.jsonl
 
 # Local-only assignment material and design notes
-docs/reference/Home_Assignment.pdf
+*.pdf
 HIGH_LEVEL_DESIGN.md
 LOW_LEVEL_DESIGN.md
 
