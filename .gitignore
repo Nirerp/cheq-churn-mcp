@@ -1,0 +1,39 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local datasets and operational output
+data/*
+!data/.gitkeep
+*.log
+*.jsonl
+
+# Local-only assignment material and design notes
+docs/reference/Home_Assignment.pdf
+HIGH_LEVEL_DESIGN.md
+LOW_LEVEL_DESIGN.md
+
+# Tabular data and spreadsheet artifacts stay local, including test-data exports.
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.ods
+*.parquet
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
