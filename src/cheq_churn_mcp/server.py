@@ -6,8 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
+from pydantic import ValidationError
 
 from cheq_churn_mcp.data.repository import CustomerRepository
+from cheq_churn_mcp.errors import CustomerNotFoundError
 from cheq_churn_mcp.observability.audit import AuditLogger
 from cheq_churn_mcp.schemas.requests import AnalyzeCustomersRequest, CustomerSnapshotRequest
 from cheq_churn_mcp.services.analytics import AnalyticsService
@@ -23,7 +26,14 @@ def create_server(dataset_path: Path) -> FastMCP:
     profiles = CustomerProfileService(repository)
     metadata = MetadataService(repository)
     audit = AuditLogger()
-    mcp = FastMCP("CHEQ Churn Insights")
+    mcp = FastMCP(
+        "CHEQ Churn Insights",
+        instructions=(
+            "Use these tools for business questions about the locally materialized Telco Customer "
+            "Churn snapshot. Do not generate or submit SQL."
+        ),
+        mask_error_details=True,
+    )
 
     @mcp.tool
     def describe_dataset() -> dict[str, object]:
@@ -51,7 +61,10 @@ def create_server(dataset_path: Path) -> FastMCP:
         }
 
         def operation() -> dict[str, Any]:
-            request = AnalyzeCustomersRequest(**arguments)
+            try:
+                request = AnalyzeCustomersRequest(**arguments)
+            except ValidationError as error:
+                raise ToolError(_analytics_validation_message(error)) from error
             return analytics.analyze(request).model_dump(mode="json")
 
         return audit.run("analyze_customers", arguments, operation)
@@ -60,9 +73,28 @@ def create_server(dataset_path: Path) -> FastMCP:
     def get_customer_snapshot(customer_id: str) -> dict[str, Any]:
         """Get an allowlisted, single-customer operational snapshot by exact ID."""
         def operation() -> dict[str, Any]:
-            request = CustomerSnapshotRequest(customer_id=customer_id)
+            try:
+                request = CustomerSnapshotRequest(customer_id=customer_id)
+            except ValidationError as error:
+                raise ToolError(
+                    "INVALID_ARGUMENT: customer_id must contain only letters, numbers, and hyphens."
+                ) from error
             return profiles.get_snapshot(request).model_dump(mode="json")
 
-        return audit.run("get_customer_snapshot", {"customer_id": customer_id}, operation)
+        try:
+            return audit.run("get_customer_snapshot", {"customer_id": customer_id}, operation)
+        except CustomerNotFoundError as error:
+            raise ToolError(
+                "NOT_FOUND: no matching customer exists in the local snapshot."
+            ) from error
 
     return mcp
+
+
+def _analytics_validation_message(error: ValidationError) -> str:
+    """Return an agent-actionable validation message without echoing untrusted values."""
+    message = error.errors(include_input=False)[0]["msg"]
+    return (
+        f"INVALID_ARGUMENT: {message}. Use describe_dataset to inspect supported fields and "
+        "analyze_customers for allowlisted metrics, filters, and groupings."
+    )

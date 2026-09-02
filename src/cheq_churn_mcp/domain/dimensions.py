@@ -21,5 +21,3 @@ DIMENSIONS: dict[str, DimensionDefinition] = {
     "gender": DimensionDefinition("gender", "Gender"),
     "offer": DimensionDefinition("offer", "Offer"),
 }
-
-NUMERIC_FILTER_COLUMNS = frozenset({"age", "monthly_charge", "tenure_months"})

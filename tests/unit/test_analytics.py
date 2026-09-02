@@ -43,3 +43,16 @@ def test_reason_intent_and_exact_reason_are_mutually_exclusive() -> None:
         AnalyzeCustomersRequest(
             filters={"reason_intent": "unclear_reason", "churn_reason": "Don't know"}
         )
+
+
+def test_grouped_results_report_small_groups_that_were_withheld(customer_csv: Path) -> None:
+    repository = CustomerRepository(customer_csv)
+    repository.open()
+
+    response = AnalyticsService(repository).analyze(
+        AnalyzeCustomersRequest(metric="customer_count", group_by=["contract"])
+    )
+
+    assert response.rows == []
+    assert response.suppressed_group_count == 2
+    repository.close()

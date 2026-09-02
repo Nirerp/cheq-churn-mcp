@@ -16,7 +16,22 @@ customer snapshot with controlled churn-reason labels, not a text corpus.
 
 Every aggregate result includes the pinned Hugging Face dataset revision and
 the applied filter definition. Grouped aggregates suppress groups below five
-customers.
+customers and report the count of suppressed groups.
+
+## Error behavior and safety
+
+The server never accepts raw SQL. It compiles only allowlisted metrics,
+dimensions, filters, and operators into parameterized DuckDB queries.
+
+- A mistyped metric, unsupported grouping, malformed customer ID, or conflicting
+  filter returns an actionable `INVALID_ARGUMENT` tool error.
+- A valid customer lookup with no matching record returns `NOT_FOUND`.
+- An empty aggregate result is valid data, returned as an empty `rows` list.
+- Unexpected server failures are masked from the MCP client; they are recorded
+  as privacy-safe audit events without customer IDs, filter values, or raw
+  exception details.
+- If the local snapshot is missing or violates its contract, the server does
+  not start and prints a safe remediation command to stderr.
 
 ## Run locally
 

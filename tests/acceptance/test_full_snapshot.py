@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from fastmcp import Client
-from mcp.shared.exceptions import MCPError
+from fastmcp.exceptions import ToolError
 
 from cheq_churn_mcp.server import create_server
 
@@ -102,9 +102,9 @@ async def test_snapshot_is_limited_to_the_safe_field_projection(full_snapshot_pa
 @pytest.mark.asyncio
 async def test_unsupported_or_conflicting_requests_are_rejected(full_snapshot_path: Path) -> None:
     async with Client(_server(full_snapshot_path)) as client:
-        with pytest.raises(MCPError, match="Invalid request parameters"):
+        with pytest.raises(ToolError, match="INVALID_ARGUMENT"):
             await client.call_tool("analyze_customers", {"metric": "raw_sql"})
-        with pytest.raises(MCPError, match="Invalid request parameters"):
+        with pytest.raises(ToolError, match="INVALID_ARGUMENT"):
             await client.call_tool(
                 "analyze_customers",
                 {
