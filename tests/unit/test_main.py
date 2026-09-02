@@ -27,7 +27,7 @@ def test_startup_failures_return_safe_remediation(
     error: Exception,
     expected_log: str,
 ) -> None:
-    def fail_startup(*_args: object) -> None:
+    def fail_startup(*_args: object, **_kwargs: object) -> None:
         raise error
 
     monkeypatch.setattr(main_module, "create_server", fail_startup)

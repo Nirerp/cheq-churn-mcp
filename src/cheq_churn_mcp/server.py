@@ -18,7 +18,7 @@ from cheq_churn_mcp.services.customer_profile import CustomerProfileService
 from cheq_churn_mcp.services.metadata import MetadataService
 
 
-def create_server(dataset_path: Path) -> FastMCP:
+def create_server(dataset_path: Path, *, enable_customer_snapshots: bool = False) -> FastMCP:
     """Create a local stdio server backed by one validated local dataset snapshot."""
     repository = CustomerRepository(dataset_path)
     repository.open()
@@ -69,24 +69,27 @@ def create_server(dataset_path: Path) -> FastMCP:
 
         return audit.run("analyze_customers", arguments, operation)
 
-    @mcp.tool
-    def get_customer_snapshot(customer_id: str) -> dict[str, Any]:
-        """Get an allowlisted, single-customer operational snapshot by exact ID."""
-        def operation() -> dict[str, Any]:
-            try:
-                request = CustomerSnapshotRequest(customer_id=customer_id)
-            except ValidationError as error:
-                raise ToolError(
-                    "INVALID_ARGUMENT: customer_id must contain only letters, numbers, and hyphens."
-                ) from error
-            return profiles.get_snapshot(request).model_dump(mode="json")
+    if enable_customer_snapshots:
 
-        try:
-            return audit.run("get_customer_snapshot", {"customer_id": customer_id}, operation)
-        except CustomerNotFoundError as error:
-            raise ToolError(
-                "NOT_FOUND: no matching customer exists in the local snapshot."
-            ) from error
+        @mcp.tool
+        def get_customer_snapshot(customer_id: str) -> dict[str, Any]:
+            """Get an allowlisted operational snapshot for an already-known customer ID."""
+            def operation() -> dict[str, Any]:
+                try:
+                    request = CustomerSnapshotRequest(customer_id=customer_id)
+                except ValidationError as error:
+                    raise ToolError(
+                        "INVALID_ARGUMENT: customer_id must contain only letters, numbers, "
+                        "and hyphens."
+                    ) from error
+                return profiles.get_snapshot(request).model_dump(mode="json")
+
+            try:
+                return audit.run("get_customer_snapshot", {"customer_id": customer_id}, operation)
+            except CustomerNotFoundError as error:
+                raise ToolError(
+                    "NOT_FOUND: no matching customer exists in the local snapshot."
+                ) from error
 
     return mcp
 
