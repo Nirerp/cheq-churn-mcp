@@ -1,16 +1,15 @@
 """Console entry point for the local stdio MCP server."""
 
-import logging
 import os
-import sys
 from pathlib import Path
 
+from cheq_churn_mcp.observability.logging import configure_stdio_logging
 from cheq_churn_mcp.server import create_server
 
 
 def main() -> None:
     """Start FastMCP over stdio; protocol output must remain on stdout only."""
-    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+    configure_stdio_logging()
     dataset_path = Path(
         os.environ.get("CHEQ_DATASET_PATH", Path.cwd() / "data" / "telco_customer_churn.csv")
     )
