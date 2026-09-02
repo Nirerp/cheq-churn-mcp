@@ -36,12 +36,21 @@ async def test_server_exposes_typed_tools_and_returns_structured_content(
 async def test_server_defaults_to_aggregate_only_tools(customer_csv: Path) -> None:
     async with Client(create_server(customer_csv)) as client:
         tools = await client.list_tools()
+        description = await client.call_tool("describe_dataset")
 
     assert {tool.name for tool in tools} == {
         "analyze_customers",
         "data_quality_summary",
         "describe_dataset",
     }
+    assert "customer_id" not in description.data["supported_analytics"]["filter_fields"]
+    assert description.data["supported_analytics"]["limits"] == {
+        "max_group_by_dimensions": 2,
+        "max_result_rows": 100,
+        "max_filter_values_per_field": 25,
+        "max_filter_value_length": 100,
+    }
+    assert "identifier discovery is unsupported" in description.data["identifier_policy"]
 
 
 @pytest.mark.asyncio
