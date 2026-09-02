@@ -56,3 +56,10 @@ def test_grouped_results_report_small_groups_that_were_withheld(customer_csv: Pa
     assert response.rows == []
     assert response.suppressed_group_count == 2
     repository.close()
+
+
+def test_filter_values_are_bounded_to_limit_resource_use() -> None:
+    with pytest.raises(ValidationError, match="at most 25 items"):
+        AnalyzeCustomersRequest(filters={"contract": ["Month-to-Month"] * 26})
+    with pytest.raises(ValidationError, match="at most 100 characters"):
+        AnalyzeCustomersRequest(filters={"contract": "x" * 101})

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cheq_churn_mcp.domain.dimensions import DIMENSIONS
 from cheq_churn_mcp.domain.metrics import METRICS
+
+MAX_FILTER_VALUE_LENGTH = 100
+MAX_FILTER_VALUES = 25
+MAX_GROUP_BY_DIMENSIONS = 2
+MAX_RESULT_ROWS = 100
+
+FilterValue = Annotated[str, Field(min_length=1, max_length=MAX_FILTER_VALUE_LENGTH)]
+FilterValues = Annotated[list[FilterValue], Field(min_length=1, max_length=MAX_FILTER_VALUES)]
 
 
 class NumericRange(BaseModel):
@@ -31,12 +39,12 @@ class CustomerFilters(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     churn: Literal[0, 1] | None = None
-    contract: str | list[str] | None = None
-    internet_type: str | list[str] | None = None
-    payment_method: str | list[str] | None = None
-    customer_status: str | list[str] | None = None
-    churn_category: str | list[str] | None = None
-    churn_reason: str | list[str] | None = None
+    contract: FilterValue | FilterValues | None = None
+    internet_type: FilterValue | FilterValues | None = None
+    payment_method: FilterValue | FilterValues | None = None
+    customer_status: FilterValue | FilterValues | None = None
+    churn_category: FilterValue | FilterValues | None = None
+    churn_reason: FilterValue | FilterValues | None = None
     reason_intent: Literal["unclear_reason"] | None = None
     age: NumericRange | None = None
     monthly_charge: NumericRange | None = None
@@ -54,9 +62,9 @@ class AnalyzeCustomersRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     metric: str = Field(default="customer_count")
-    group_by: list[str] = Field(default_factory=list, max_length=2)
+    group_by: list[str] = Field(default_factory=list, max_length=MAX_GROUP_BY_DIMENSIONS)
     filters: CustomerFilters = Field(default_factory=CustomerFilters)
-    limit: int = Field(default=20, ge=1, le=100)
+    limit: int = Field(default=20, ge=1, le=MAX_RESULT_ROWS)
 
     @model_validator(mode="after")
     def validate_registry_references(self) -> AnalyzeCustomersRequest:
