@@ -59,8 +59,9 @@ trusted-demo mode instead:
 make demo-trusted
 ```
 
-This exposes `get_customer_snapshot` only for an ID the caller already knows;
-the response excludes that identifier and direct identifier discovery remains
+This exposes `get_customer_snapshot` only for an ID the caller already knows.
+The caller can request only the safe fields it needs, including coarse country;
+the response excludes the identifier and direct identifier discovery remains
 unsupported. It is a local demo switch, not authentication or RBAC.
 
 Run the MCP server over stdio:
@@ -240,8 +241,13 @@ tool; it must not generate arbitrary SQL.
   `metric="churn_rate"` and `group_by=["contract"]`
 - “How many churned customers said they don't know why?” → `analyze_customers`
   with `metric="churned_customers"` and `filters={"reason_intent": "unclear_reason"}`
+- “How many non-churned customers live outside the United States?” →
+  `analyze_customers` with `metric="customer_count"` and
+  `filters={"churn": 0, "exclude_country": "United States"}`
 - In trusted-demo mode only: “Show the operational churn snapshot for known
   customer `0002-ORFBO`.” → `get_customer_snapshot(customer_id="0002-ORFBO")`
+- In trusted-demo mode only: “Which country is known customer `0002-ORFBO` in?”
+  → `get_customer_snapshot(customer_id="0002-ORFBO", fields=["country"])`
 
 ## Verify
 

@@ -30,8 +30,14 @@ def _where_clause(filters: CustomerFilters) -> tuple[str, list[Any]]:
     parameters: list[Any] = []
     values = filters.model_dump(exclude_none=True)
     for name in (
-        "churn", "contract", "internet_type", "payment_method", "customer_status",
-        "churn_category", "churn_reason",
+        "churn",
+        "contract",
+        "country",
+        "internet_type",
+        "payment_method",
+        "customer_status",
+        "churn_category",
+        "churn_reason",
     ):
         value = values.get(name)
         if value is None:
@@ -42,6 +48,11 @@ def _where_clause(filters: CustomerFilters) -> tuple[str, list[Any]]:
         else:
             fragments.append(f"{name} = ?")
             parameters.append(value)
+    if filters.exclude_country is not None:
+        excluded = filters.exclude_country
+        excluded_values = excluded if isinstance(excluded, list) else [excluded]
+        fragments.append(f"country NOT IN ({', '.join('?' for _ in excluded_values)})")
+        parameters.extend(excluded_values)
     if filters.reason_intent:
         intent = REASON_INTENTS[filters.reason_intent]
         fragments.append(f"churn_reason IN ({', '.join('?' for _ in intent.values)})")

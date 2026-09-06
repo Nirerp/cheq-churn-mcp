@@ -87,15 +87,33 @@ async def test_unclear_reason_intent_matches_the_source_label(full_snapshot_path
 @pytest.mark.asyncio
 async def test_snapshot_is_limited_to_the_safe_field_projection(full_snapshot_path: Path) -> None:
     async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
-        result = await client.call_tool(
-            "get_customer_snapshot", {"customer_id": "0002-ORFBO"}
-        )
+        result = await client.call_tool("get_customer_snapshot", {"customer_id": "0002-ORFBO"})
 
     customer = result.data["customer"]
     assert "customer_id" not in customer
     assert "payment_method" not in customer
     assert "age" not in customer
     assert "zip_code" not in customer
+
+
+@pytest.mark.acceptance
+@pytest.mark.asyncio
+async def test_country_analytics_and_minimized_lookup(full_snapshot_path: Path) -> None:
+    async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
+        aggregate = await client.call_tool(
+            "analyze_customers",
+            {
+                "metric": "customer_count",
+                "filters": {"churn": 0, "exclude_country": "United States"},
+            },
+        )
+        snapshot = await client.call_tool(
+            "get_customer_snapshot",
+            {"customer_id": "0002-ORFBO", "fields": ["country"]},
+        )
+
+    assert aggregate.data["rows"] == [{"eligible_customers": 0, "value": 0}]
+    assert snapshot.data["customer"] == {"country": "United States"}
 
 
 @pytest.mark.acceptance

@@ -21,6 +21,7 @@ COLUMN_ALIASES: Mapping[str, str] = {
     "churn_score": "Churn Score",
     "customer_status": "Customer Status",
     "contract": "Contract",
+    "country": "Country",
     "internet_type": "Internet Type",
     "gender": "Gender",
     "married": "Married",
