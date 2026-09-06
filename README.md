@@ -41,80 +41,128 @@ dimensions, filters, and operators into parameterized DuckDB queries.
 - If the local snapshot is missing or violates its contract, the server does
   not start and prints a safe remediation command to stderr.
 
-## Run locally
+## Quick start
 
-Do not commit downloaded source data. After confirming source attribution and
-redistribution terms, materialize the pinned source into the ignored local cache:
+The MCP has two deliberately different access modes. Use the regular server for
+normal analytics. Install the trusted-demo server only when you specifically
+want to demonstrate customer-ID discovery or known-customer lookup.
+
+### One-time setup
+
+From the cloned repository:
 
 ```bash
-uv run python scripts/bootstrap_data.py
+uv sync --all-groups
+make bootstrap
 ```
 
-Or use the complete local demo path; it bootstraps the source, runs validation,
-then starts the stdio MCP process:
+`make bootstrap` downloads the pinned 7,043-row dataset into the ignored local
+`data/` directory. The dataset is not stored in Git and must be bootstrapped on
+each new clone.
+
+### Option A: regular MCP — recommended default
+
+The regular MCP is registered as `cheq-churn`. It exposes only:
+
+- `describe_dataset`
+- `analyze_customers`
+- `data_quality_summary`
+
+It can answer aggregate questions such as churn counts, rates, reasons, and
+grouped comparisons. It cannot discover a customer ID or retrieve an individual
+customer snapshot.
+
+Register it with one client:
 
 ```bash
-make demo
-```
-
-For a controlled local demonstration of bounded identifier discovery and
-known-ID snapshots, use the explicit trusted-demo mode instead:
-
-```bash
-make demo-trusted
-```
-
-This exposes `find_customer_ids` for a non-empty allowlisted filter, an
-allowlisted purpose, and at most 10 results. It also exposes
-`get_customer_snapshot`; the caller can request only the safe fields it needs,
-including coarse country. It is a local demo switch, not authentication or
-RBAC.
-
-Run the MCP server over stdio:
-
-```bash
-uv run cheq-churn-mcp
-```
-
-For a different local snapshot, set `CHEQ_DATASET_PATH` to its CSV path. The
-server writes protocol messages to stdout; diagnostics go to stderr.
-
-## Connect an MCP client
-
-First clone the repository and run `uv sync --all-groups`. The data bootstrap
-is deliberately local: the dataset is ignored by Git and must be materialized
-on each machine before the server starts.
-
-### Standard aggregate-only mode
-
-This is the normal configuration. It exposes only aggregate tools and cannot
-look up or discover customer IDs.
-
-#### Codex with the Makefile
-
-Install the server for the current clone with:
-
-```bash
+# Codex
 make install-codex
-```
 
-It refuses to overwrite an existing `cheq-churn` configuration. To inspect the
-registered server, run `codex mcp get cheq-churn`; restart Codex afterward.
-#### Claude Code with the Makefile
-
-With the Claude Code CLI installed, register the same local server with:
-
-```bash
+# Claude Code
 make install-claude-code
 ```
 
-This uses Claude Code's `claude mcp add` command.
+Restart that client after installation. Confirm the registration with
+`codex mcp get cheq-churn` or `claude mcp get cheq-churn`, then ask an aggregate
+question such as “What percentage of customers churned?”
 
-#### Manual Codex configuration
+Remove the regular registration with:
 
-This server is local stdio, not an HTTP service. Add the following to
-`~/.codex/config.toml`, or to `.codex/config.toml` in a trusted clone, and
-replace the placeholder with the clone's absolute path:
+```bash
+make remove-codex
+# or
+make remove-claude-code
+```
+
+### Option B: trusted-demo MCP — explicit privileged demo
+
+The trusted-demo MCP is registered separately as `cheq-churn-trusted`. It
+exposes all three regular tools plus:
+
+- `find_customer_ids` — returns at most 10 matching IDs; requires a non-empty
+  allowlisted filter and an allowlisted purpose code.
+- `get_customer_snapshot` — retrieves selected safe fields for an already-known
+  or newly discovered ID.
+
+Register it with one client:
+
+```bash
+# Codex
+make install-codex-trusted
+
+# Claude Code
+make install-claude-code-trusted
+```
+
+Restart that client after installation. Confirm the registration with
+`codex mcp get cheq-churn-trusted` or `claude mcp get cheq-churn-trusted`. You
+can then ask: “Using only `cheq-churn-trusted`, give me one customer ID for a
+customer who churned for an unclear reason.”
+
+Remove the trusted registration with:
+
+```bash
+make remove-codex-trusted
+# or
+make remove-claude-code-trusted
+```
+
+You may register both names simultaneously. They launch the same application,
+but only the trusted registration sets `CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1`. Choose
+the server explicitly in sensitive tests so the access boundary is visible.
+
+The trusted switch is not real authentication or RBAC. Any local user who can
+edit the MCP configuration or read the source dataset can enable it. In
+production, this capability would sit behind an authenticated remote MCP and an
+authorization policy evaluated for every request.
+
+### What do `make demo` and `make demo-trusted` do?
+
+These targets are terminal smoke-test helpers; they do not install anything
+into Codex or Claude Code.
+
+```bash
+make demo          # bootstrap, test, then start the regular STDIO server
+make demo-trusted  # bootstrap, test, then start the trusted STDIO server
+```
+
+An MCP STDIO server waits for protocol messages on standard input, so it may
+look idle when started directly in a terminal. For normal interactive use,
+prefer one of the `make install-*` targets and let Codex or Claude Code start the
+process. Press Ctrl+C to stop a directly launched demo server.
+
+For a different local CSV snapshot, set `CHEQ_DATASET_PATH` before starting the
+server. Protocol messages use stdout; diagnostics use stderr.
+
+## Manual MCP configuration
+
+The Makefile commands above are the easiest setup. The equivalent manual
+configuration is shown here for inspection or clients where the Makefile cannot
+be used. Replace the placeholder with the clone's absolute path.
+
+### Regular Codex
+
+Add to `~/.codex/config.toml`, or `.codex/config.toml` in a trusted clone:
 
 ```toml
 [mcp_servers.cheq-churn]
@@ -122,14 +170,20 @@ command = "uv"
 args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]
 ```
 
-Restart Codex after saving. There is no `0.0.0.0:port` address in this local
-configuration because Codex starts the process and communicates over stdin and
-stdout.
+### Trusted-demo Codex
 
-#### Manual Claude Code configuration
+```toml
+[mcp_servers.cheq-churn-trusted]
+command = "uv"
+args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]
 
-Create `.mcp.json` in the clone root, or add this server entry to an existing
-`.mcp.json` file:
+[mcp_servers.cheq-churn-trusted.env]
+CHEQ_ENABLE_SNAPSHOT_LOOKUPS = "1"
+```
+
+### Regular Claude Code
+
+Create `.mcp.json` in the clone root, or merge this entry into an existing file:
 
 ```json
 {
@@ -148,97 +202,31 @@ Create `.mcp.json` in the clone root, or add this server entry to an existing
 }
 ```
 
-Alternatively, run `make print-mcp-config` to generate both ready-to-paste
-entries for this clone. Claude Code requires approval before using a
-project-scoped server from `.mcp.json`.
-
-When the demo is over, remove only this server entry with:
-
-```bash
-make remove-codex
-```
-
-For Claude Code, run:
-
-```bash
-make remove-claude-code
-```
-
-### Trusted local demonstration: bounded ID discovery and lookups
-
-This is not an "admin" mode and not RBAC. A local stdio process has no trusted
-caller identity. It is a deliberately separate, opt-in demonstration mode for
-bounded identifier discovery and known-ID lookup. The default `cheq-churn`
-server remains aggregate-only.
-
-#### Codex or Claude Code with the Makefile
-
-Register a separately named trusted-demo server:
-
-```bash
-make install-codex-trusted
-# or
-make install-claude-code-trusted
-```
-
-Restart the client, then ask it to find up to 10 IDs using a non-empty
-allowlisted filter and one of these purpose codes: `churn_investigation`,
-`customer_support`, `data_quality`, or `security_investigation`. You can then
-request selected safe fields for a returned or already-known ID. A valid-looking
-ID that is not in the dataset returns `NOT_FOUND`; malformed or unbounded
-requests return `INVALID_ARGUMENT`. Remove the server when the demonstration
-ends:
-
-```bash
-make remove-codex-trusted
-# or
-make remove-claude-code-trusted
-```
-
-#### Manual trusted-demo configuration
-
-The only difference from the standard configuration is the environment
-variable `CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1`. For Codex, add a separately named
-entry to `config.toml`:
-
-```toml
-[mcp_servers.cheq-churn-trusted]
-command = "uv"
-args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]
-
-[mcp_servers.cheq-churn-trusted.env]
-CHEQ_ENABLE_SNAPSHOT_LOOKUPS = "1"
-```
-
-For Claude Code, add this entry under `mcpServers` in `.mcp.json`:
+### Trusted-demo Claude Code
 
 ```json
 {
-  "cheq-churn-trusted": {
-    "type": "stdio",
-    "command": "uv",
-    "args": [
-      "run",
-      "--directory",
-      "/ABSOLUTE/PATH/TO/cheq-churn-mcp",
-      "cheq-churn-mcp"
-    ],
-    "env": {
-      "CHEQ_ENABLE_SNAPSHOT_LOOKUPS": "1"
+  "mcpServers": {
+    "cheq-churn-trusted": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/ABSOLUTE/PATH/TO/cheq-churn-mcp",
+        "cheq-churn-mcp"
+      ],
+      "env": {
+        "CHEQ_ENABLE_SNAPSHOT_LOOKUPS": "1"
+      }
     }
   }
 }
 ```
 
-Alternatively, run `make print-mcp-config-trusted` for ready-to-paste Codex
-TOML and Claude Code JSON. Keep the server name `cheq-churn-trusted` so its
-elevated local-demo behavior is visible during testing.
-
-For a standalone terminal process rather than a configured MCP client, run:
-
-```bash
-make demo-trusted
-```
+Run `make print-mcp-config` or `make print-mcp-config-trusted` to print
+ready-to-paste entries using the current clone's absolute path. This is a local
+STDIO server, so there is no hostname, listening port, or `0.0.0.0` address.
 
 ## Example business prompts
 
@@ -273,18 +261,52 @@ uv run pytest
 The assignment PDF, datasets/spreadsheets, and working design documents are
 intentionally local-only and excluded by `.gitignore`.
 
-## Docker
+## Optional Docker runtime
 
-The image deliberately excludes the local dataset. Build it, then mount the
-ignored local cache read-only when running the stdio server:
+Docker is not required for the assignment's normal local path. The
+`make install-*` commands above run the MCP directly with `uv`.
+
+The Dockerfile provides a reproducible alternative runtime: it packages the
+Python application and dependencies into an image. DuckDB is embedded in the
+application process, so there is no separate DuckDB container, database server,
+port, or Docker Compose stack to start. One MCP process is the entire runtime.
+
+The image deliberately excludes the customer dataset. Bootstrap it on the host,
+build the image, and mount the local `data/` directory read-only at runtime:
 
 ```bash
+make bootstrap
 docker build --tag cheq-churn-mcp:local .
-docker run -i --rm -v "$(pwd)/data:/app/data:ro" cheq-churn-mcp:local
+docker run --interactive --rm \
+  --mount type=bind,source="$(pwd)/data",target=/app/data,readonly \
+  cheq-churn-mcp:local
 ```
 
-To use a dataset mounted elsewhere in the container, set
-`CHEQ_DATASET_PATH` to its in-container CSV path. The bootstrap stores newly
-materialized data and metadata owner-only and writes them atomically. If you
-bootstrapped this repository before that protection existed, rerun
-`uv run python scripts/bootstrap_data.py --overwrite` once.
+The flags matter:
+
+- `--interactive` keeps stdin open because this MCP uses STDIO transport.
+- `--rm` removes the stopped container; it does not delete the host dataset.
+- `--mount ... readonly` makes the ignored host dataset visible at `/app/data`
+  without copying it into the image or allowing the container to modify it.
+- No `-p` flag is needed because the local server does not listen on a network
+  port.
+
+That command starts the regular aggregate-only server. To start the same image
+with the trusted-demo tools enabled, pass the explicit environment variable:
+
+```bash
+docker run --interactive --rm \
+  --env CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 \
+  --mount type=bind,source="$(pwd)/data",target=/app/data,readonly \
+  cheq-churn-mcp:local
+```
+
+These commands are useful for checking that the application runs in a clean,
+reproducible environment. They still start an STDIO MCP process, so a directly
+launched container may appear idle while it waits for protocol input. The
+repository's Codex and Claude Code installation helpers intentionally use the
+simpler `uv` runtime, not Docker.
+
+For a CSV mounted at another container path, set `CHEQ_DATASET_PATH` to that
+in-container path. Docker's bind-mount behavior is documented in the
+[Docker storage guide](https://docs.docker.com/engine/storage/bind-mounts/).
