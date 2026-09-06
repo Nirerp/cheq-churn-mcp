@@ -121,7 +121,7 @@ make install-codex-trusted
 make install-claude-code-trusted
 ```
 
-Those commands **only start an MCP process in a container**. They do not connect
+The Docker commands above **only start an MCP process in a container**. They do not connect
 it to Codex or Claude Code, and the container will wait on standard input.
 
 The `make install-*` commands above connect the client by having it launch the
