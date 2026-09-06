@@ -85,6 +85,26 @@ async def test_unclear_reason_intent_matches_the_source_label(full_snapshot_path
 
 @pytest.mark.acceptance
 @pytest.mark.asyncio
+async def test_trusted_discovery_finds_an_unclear_reason_customer(
+    full_snapshot_path: Path,
+) -> None:
+    async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
+        result = await client.call_tool(
+            "find_customer_ids",
+            {
+                "filters": {"churn": 1, "reason_intent": "unclear_reason"},
+                "purpose": "churn_investigation",
+                "limit": 1,
+            },
+        )
+
+    assert result.data["customer_ids"] == ["0023-XUOPT"]
+    assert result.data["returned_count"] == 1
+    assert result.data["more_available"] is True
+
+
+@pytest.mark.acceptance
+@pytest.mark.asyncio
 async def test_snapshot_is_limited_to_the_safe_field_projection(full_snapshot_path: Path) -> None:
     async with Client(_server(full_snapshot_path, enable_customer_snapshots=True)) as client:
         result = await client.call_tool("get_customer_snapshot", {"customer_id": "0002-ORFBO"})

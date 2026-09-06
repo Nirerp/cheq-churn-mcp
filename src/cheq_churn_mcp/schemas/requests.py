@@ -8,11 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cheq_churn_mcp.domain.dimensions import DIMENSIONS
 from cheq_churn_mcp.domain.metrics import METRICS
-from cheq_churn_mcp.domain.policy import CUSTOMER_SNAPSHOT_FIELDS, CustomerSnapshotField
+from cheq_churn_mcp.domain.policy import (
+    CUSTOMER_SNAPSHOT_FIELDS,
+    CustomerSnapshotField,
+    DiscoveryPurpose,
+)
 
 MAX_FILTER_VALUE_LENGTH = 100
 MAX_FILTER_VALUES = 25
 MAX_GROUP_BY_DIMENSIONS = 2
+MAX_IDENTIFIER_RESULTS = 10
 MAX_RESULT_ROWS = 100
 
 FilterValue = Annotated[str, Field(min_length=1, max_length=MAX_FILTER_VALUE_LENGTH)]
@@ -98,4 +103,19 @@ class CustomerSnapshotRequest(BaseModel):
     def reject_duplicate_fields(self) -> CustomerSnapshotRequest:
         if len(set(self.fields)) != len(self.fields):
             raise ValueError("snapshot fields must not repeat")
+        return self
+
+
+class CustomerIdDiscoveryRequest(BaseModel):
+    """Input for a bounded, purpose-gated trusted-demo identifier search."""
+
+    model_config = ConfigDict(extra="forbid")
+    filters: CustomerFilters
+    purpose: DiscoveryPurpose
+    limit: int = Field(default=1, ge=1, le=MAX_IDENTIFIER_RESULTS)
+
+    @model_validator(mode="after")
+    def require_filter(self) -> CustomerIdDiscoveryRequest:
+        if not self.filters.model_dump(exclude_none=True):
+            raise ValueError("at least one customer filter is required")
         return self

@@ -10,11 +10,16 @@ from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
 
 from cheq_churn_mcp.data.repository import CustomerRepository
-from cheq_churn_mcp.domain.policy import CustomerSnapshotField
+from cheq_churn_mcp.domain.policy import CustomerSnapshotField, DiscoveryPurpose
 from cheq_churn_mcp.errors import CustomerNotFoundError
 from cheq_churn_mcp.observability.audit import AuditLogger
-from cheq_churn_mcp.schemas.requests import AnalyzeCustomersRequest, CustomerSnapshotRequest
+from cheq_churn_mcp.schemas.requests import (
+    AnalyzeCustomersRequest,
+    CustomerIdDiscoveryRequest,
+    CustomerSnapshotRequest,
+)
 from cheq_churn_mcp.services.analytics import AnalyticsService
+from cheq_churn_mcp.services.customer_discovery import CustomerDiscoveryService
 from cheq_churn_mcp.services.customer_profile import CustomerProfileService
 from cheq_churn_mcp.services.metadata import MetadataService
 
@@ -24,8 +29,9 @@ def create_server(dataset_path: Path, *, enable_customer_snapshots: bool = False
     repository = CustomerRepository(dataset_path)
     repository.open()
     analytics = AnalyticsService(repository)
+    discovery = CustomerDiscoveryService(repository)
     profiles = CustomerProfileService(repository)
-    metadata = MetadataService(repository)
+    metadata = MetadataService(repository, allow_identifier_discovery=enable_customer_snapshots)
     audit = AuditLogger()
     mcp = FastMCP(
         "CHEQ Churn Insights",
@@ -73,6 +79,24 @@ def create_server(dataset_path: Path, *, enable_customer_snapshots: bool = False
     if enable_customer_snapshots:
 
         @mcp.tool
+        def find_customer_ids(
+            filters: dict[str, Any],
+            purpose: DiscoveryPurpose,
+            limit: int = 1,
+        ) -> dict[str, Any]:
+            """Find up to 10 IDs by safe filters in trusted demo mode; purpose is required."""
+            arguments = {"filters": filters, "purpose": purpose, "limit": limit}
+
+            def operation() -> dict[str, Any]:
+                try:
+                    request = CustomerIdDiscoveryRequest(**arguments)
+                except ValidationError as error:
+                    raise ToolError(_identifier_discovery_validation_message(error)) from error
+                return discovery.find_ids(request).model_dump(mode="json")
+
+            return audit.run("find_customer_ids", arguments, operation)
+
+        @mcp.tool
         def get_customer_snapshot(
             customer_id: str,
             fields: list[CustomerSnapshotField] | None = None,
@@ -112,4 +136,13 @@ def _analytics_validation_message(error: ValidationError) -> str:
     return (
         f"INVALID_ARGUMENT: {message}. Use describe_dataset to inspect supported fields and "
         "analyze_customers for allowlisted metrics, filters, and groupings."
+    )
+
+
+def _identifier_discovery_validation_message(error: ValidationError) -> str:
+    """Return useful discovery guidance without echoing sensitive input values."""
+    message = error.errors(include_input=False)[0]["msg"]
+    return (
+        f"INVALID_ARGUMENT: {message}. Identifier discovery requires a stated purpose, one or "
+        "more allowlisted filters, and a limit from 1 to 10."
     )

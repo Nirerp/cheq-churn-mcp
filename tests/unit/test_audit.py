@@ -17,6 +17,8 @@ def test_audit_event_records_control_shape_without_pii(caplog: pytest.LogCapture
             {
                 "customer_id": "0002-ORFBO",
                 "filters": {"churn_reason": "Don't know"},
+                "purpose": "churn_investigation",
+                "limit": 1,
             },
             lambda: "ok",
         )
@@ -25,6 +27,8 @@ def test_audit_event_records_control_shape_without_pii(caplog: pytest.LogCapture
     event = caplog.messages[-1]
     assert '"customer_lookup_requested": true' in event
     assert '"filter_fields": ["churn_reason"]' in event
+    assert '"purpose": "churn_investigation"' in event
+    assert '"result_limit": 1' in event
     assert "0002-ORFBO" not in event
     assert "Don't know" not in event
 
@@ -43,6 +47,18 @@ def test_audit_event_records_errors_without_exception_text(
     assert '"outcome": "error"' in event
     assert "private details" not in event
     assert "secret-id" not in event
+
+
+def test_audit_does_not_record_an_untrusted_purpose(caplog: pytest.LogCaptureFixture) -> None:
+    logger = logging.getLogger("test.audit.purpose")
+    audit = AuditLogger(logger)
+
+    with caplog.at_level(logging.INFO, logger="test.audit.purpose"):
+        audit.run("find_customer_ids", {"purpose": "private customer details"}, lambda: None)
+
+    event = caplog.messages[-1]
+    assert '"purpose": "invalid"' in event
+    assert "private customer details" not in event
 
 
 def _raise_private_error() -> None:

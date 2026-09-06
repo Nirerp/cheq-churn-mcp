@@ -8,6 +8,8 @@ from collections.abc import Callable, Mapping
 from time import perf_counter
 from typing import Any, TypeVar
 
+from cheq_churn_mcp.domain.policy import ALLOWED_DISCOVERY_PURPOSES
+
 T = TypeVar("T")
 
 
@@ -52,4 +54,13 @@ def _safe_request_shape(arguments: Mapping[str, Any]) -> dict[str, Any]:
         summary["filter_fields"] = sorted(arguments["filters"])
     if "customer_id" in arguments:
         summary["customer_lookup_requested"] = True
+    if "purpose" in arguments:
+        purpose = arguments["purpose"]
+        summary["purpose"] = (
+            purpose
+            if isinstance(purpose, str) and purpose in ALLOWED_DISCOVERY_PURPOSES
+            else "invalid"
+        )
+    if "limit" in arguments and "metric" not in arguments:
+        summary["result_limit"] = arguments["limit"]
     return summary

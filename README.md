@@ -16,6 +16,11 @@ customer snapshot with controlled churn-reason labels, not a text corpus.
 The default server is aggregate-only. It intentionally does not expose any
 customer lookup or ID-discovery tool.
 
+The separately configured trusted-demo server also exposes
+`find_customer_ids` and `get_customer_snapshot`. This is an explicit local
+capability switch for demonstrating privileged workflows, not authenticated
+RBAC.
+
 Every aggregate result includes the pinned Hugging Face dataset revision and
 the applied filter definition. Grouped aggregates suppress groups below five
 customers and report the count of suppressed groups.
@@ -52,17 +57,18 @@ then starts the stdio MCP process:
 make demo
 ```
 
-For a controlled local demonstration of a known-ID snapshot, use the explicit
-trusted-demo mode instead:
+For a controlled local demonstration of bounded identifier discovery and
+known-ID snapshots, use the explicit trusted-demo mode instead:
 
 ```bash
 make demo-trusted
 ```
 
-This exposes `get_customer_snapshot` only for an ID the caller already knows.
-The caller can request only the safe fields it needs, including coarse country;
-the response excludes the identifier and direct identifier discovery remains
-unsupported. It is a local demo switch, not authentication or RBAC.
+This exposes `find_customer_ids` for a non-empty allowlisted filter, an
+allowlisted purpose, and at most 10 results. It also exposes
+`get_customer_snapshot`; the caller can request only the safe fields it needs,
+including coarse country. It is a local demo switch, not authentication or
+RBAC.
 
 Run the MCP server over stdio:
 
@@ -158,12 +164,12 @@ For Claude Code, run:
 make remove-claude-code
 ```
 
-### Trusted local demonstration: known customer-ID lookups
+### Trusted local demonstration: bounded ID discovery and lookups
 
 This is not an "admin" mode and not RBAC. A local stdio process has no trusted
 caller identity. It is a deliberately separate, opt-in demonstration mode for
-an ID the caller already knows. The default `cheq-churn` server remains
-aggregate-only.
+bounded identifier discovery and known-ID lookup. The default `cheq-churn`
+server remains aggregate-only.
 
 #### Codex or Claude Code with the Makefile
 
@@ -175,10 +181,13 @@ make install-codex-trusted
 make install-claude-code-trusted
 ```
 
-Restart the client, then ask for the allowlisted operational snapshot of a
-known customer ID. A valid-looking ID that is not in the dataset returns
-`NOT_FOUND`; a malformed ID returns `INVALID_ARGUMENT`. Remove the server when
-the demonstration ends:
+Restart the client, then ask it to find up to 10 IDs using a non-empty
+allowlisted filter and one of these purpose codes: `churn_investigation`,
+`customer_support`, `data_quality`, or `security_investigation`. You can then
+request selected safe fields for a returned or already-known ID. A valid-looking
+ID that is not in the dataset returns `NOT_FOUND`; malformed or unbounded
+requests return `INVALID_ARGUMENT`. Remove the server when the demonstration
+ends:
 
 ```bash
 make remove-codex-trusted
@@ -248,6 +257,10 @@ tool; it must not generate arbitrary SQL.
   customer `0002-ORFBO`.” → `get_customer_snapshot(customer_id="0002-ORFBO")`
 - In trusted-demo mode only: “Which country is known customer `0002-ORFBO` in?”
   → `get_customer_snapshot(customer_id="0002-ORFBO", fields=["country"])`
+- In trusted-demo mode only: “Give me one customer ID for someone who churned
+  for an unclear reason.” → `find_customer_ids` with
+  `filters={"churn": 1, "reason_intent": "unclear_reason"}`,
+  `purpose="churn_investigation"`, and `limit=1`
 
 ## Verify
 
