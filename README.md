@@ -28,21 +28,21 @@ make bootstrap
 `make bootstrap` downloads the pinned 7,043-row dataset into the ignored
 `data/` directory. It is not committed to Git.
 
-### 3. Run FastMCP
+### 3. Run the demo
 
 In a terminal, start the mode you want to test:
 
 ```bash
-# Regular server
-uv run cheq-churn-mcp
+# Regular server: bootstrap, run checks, then start FastMCP
+make demo
 
-# Trusted local demo
-CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
+# Trusted local demo: bootstrap, run checks, then start FastMCP with lookup tools
+make demo-trusted
 ```
 
-The server will look idle because it is waiting for STDIO MCP messages. That
-confirms FastMCP started correctly. Press `Ctrl+C` to stop it before the next
-step: Codex and Claude Code start their own STDIO process.
+The server will look idle because it is waiting for STDIO MCP messages. Press
+`Ctrl+C` to stop it before the next step: Codex and Claude Code start their own
+STDIO process.
 
 ### 4. Register the MCP with Codex or Claude Code
 
