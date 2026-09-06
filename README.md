@@ -108,14 +108,25 @@ docker run --interactive --rm \
   cheq-churn-mcp:local
 ```
 
+After testing the container, press `Ctrl+C`, then register the MCP with the
+client you want to use:
+
+```bash
+# Regular server
+make install-codex
+make install-claude-code
+
+# Trusted local demo
+make install-codex-trusted
+make install-claude-code-trusted
+```
+
 Those commands **only start an MCP process in a container**. They do not connect
 it to Codex or Claude Code, and the container will wait on standard input.
 
-If your goal is simply to use the MCP with Codex or Claude Code, use the
-`make install-*` command in step 4. It connects the client by having it launch
-the `uv` version of the server. Do **not** start a Docker container and then run
-`make install-codex` expecting Codex to attach to that container; STDIO does not
-work that way.
+The `make install-*` commands above connect the client by having it launch the
+`uv` version of the server. They do **not** attach Codex or Claude Code to the
+container you just ran; STDIO does not work that way.
 
 To make a client launch the Docker image instead, add a manual STDIO MCP entry
 whose command is `docker run --interactive --rm ...`, with an absolute,
