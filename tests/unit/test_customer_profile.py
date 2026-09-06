@@ -20,3 +20,15 @@ def test_snapshot_omits_precise_location_and_payment_data(customer_csv: Path) ->
     assert "payment_method" not in response.customer
     assert "age" not in response.customer
     repository.close()
+
+
+def test_snapshot_returns_only_requested_safe_fields(customer_csv: Path) -> None:
+    repository = CustomerRepository(customer_csv)
+    repository.open()
+
+    response = CustomerProfileService(repository).get_snapshot(
+        CustomerSnapshotRequest(customer_id="0001-AAAAA", fields=["country", "churn"])
+    )
+
+    assert response.customer == {"country": "United States", "churn": 1}
+    repository.close()

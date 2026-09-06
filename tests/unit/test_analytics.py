@@ -11,9 +11,7 @@ from cheq_churn_mcp.services.analytics import AnalyticsService, compile_analytic
 
 
 def test_compiler_binds_untrusted_filter_values() -> None:
-    request = AnalyzeCustomersRequest(
-        filters={"contract": "Month-to-Month' OR 1=1 --"}
-    )
+    request = AnalyzeCustomersRequest(filters={"contract": "Month-to-Month' OR 1=1 --"})
 
     compiled = compile_analytics_query(request)
 
@@ -35,6 +33,27 @@ def test_unclear_reason_intent_is_counted_as_an_aggregate(customer_csv: Path) ->
 
     assert response.rows == [{"eligible_customers": 1, "value": 1}]
     assert response.provenance.filters_applied == {"reason_intent": "unclear_reason"}
+    repository.close()
+
+
+def test_country_include_and_exclude_filters_are_allowlisted(customer_csv: Path) -> None:
+    repository = CustomerRepository(customer_csv)
+    repository.open()
+
+    response = AnalyticsService(repository).analyze(
+        AnalyzeCustomersRequest(metric="customer_count", filters={"country": "Canada"})
+    )
+
+    assert response.rows == [{"eligible_customers": 1, "value": 1}]
+
+    response = AnalyticsService(repository).analyze(
+        AnalyzeCustomersRequest(
+            metric="customer_count",
+            filters={"churn": 0, "exclude_country": "United States"},
+        )
+    )
+
+    assert response.rows == [{"eligible_customers": 1, "value": 1}]
     repository.close()
 
 

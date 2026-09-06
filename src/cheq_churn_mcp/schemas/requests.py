@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from cheq_churn_mcp.domain.dimensions import DIMENSIONS
 from cheq_churn_mcp.domain.metrics import METRICS
+from cheq_churn_mcp.domain.policy import CUSTOMER_SNAPSHOT_FIELDS, CustomerSnapshotField
 
 MAX_FILTER_VALUE_LENGTH = 100
 MAX_FILTER_VALUES = 25
@@ -40,6 +41,8 @@ class CustomerFilters(BaseModel):
     model_config = ConfigDict(extra="forbid")
     churn: Literal[0, 1] | None = None
     contract: FilterValue | FilterValues | None = None
+    country: FilterValue | FilterValues | None = None
+    exclude_country: FilterValue | FilterValues | None = None
     internet_type: FilterValue | FilterValues | None = None
     payment_method: FilterValue | FilterValues | None = None
     customer_status: FilterValue | FilterValues | None = None
@@ -85,3 +88,14 @@ class CustomerSnapshotRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     customer_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9-]+$")
+    fields: list[CustomerSnapshotField] = Field(
+        default_factory=lambda: list(CUSTOMER_SNAPSHOT_FIELDS),
+        min_length=1,
+        max_length=len(CUSTOMER_SNAPSHOT_FIELDS),
+    )
+
+    @model_validator(mode="after")
+    def reject_duplicate_fields(self) -> CustomerSnapshotRequest:
+        if len(set(self.fields)) != len(self.fields):
+            raise ValueError("snapshot fields must not repeat")
+        return self

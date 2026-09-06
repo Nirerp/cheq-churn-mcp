@@ -2,7 +2,6 @@
 
 from cheq_churn_mcp.data.contract import CUSTOMER_TABLE, DATASET_ID, DATASET_REVISION
 from cheq_churn_mcp.data.repository import CustomerRepository
-from cheq_churn_mcp.domain.policy import CUSTOMER_SNAPSHOT_FIELDS
 from cheq_churn_mcp.errors import CustomerNotFoundError
 from cheq_churn_mcp.schemas.requests import CustomerSnapshotRequest
 from cheq_churn_mcp.schemas.responses import CustomerSnapshotResponse, Provenance
@@ -16,7 +15,7 @@ class CustomerProfileService:
 
     def get_snapshot(self, request: CustomerSnapshotRequest) -> CustomerSnapshotResponse:
         """Look up a single identifier without exposing location or payment detail."""
-        fields = ", ".join(CUSTOMER_SNAPSHOT_FIELDS)
+        fields = ", ".join(request.fields)
         customer = self._repository.fetch_one(
             f"SELECT {fields} FROM {CUSTOMER_TABLE} WHERE customer_id = ?", [request.customer_id]
         )

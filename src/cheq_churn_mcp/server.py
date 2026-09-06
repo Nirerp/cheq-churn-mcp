@@ -10,6 +10,7 @@ from fastmcp.exceptions import ToolError
 from pydantic import ValidationError
 
 from cheq_churn_mcp.data.repository import CustomerRepository
+from cheq_churn_mcp.domain.policy import CustomerSnapshotField
 from cheq_churn_mcp.errors import CustomerNotFoundError
 from cheq_churn_mcp.observability.audit import AuditLogger
 from cheq_churn_mcp.schemas.requests import AnalyzeCustomersRequest, CustomerSnapshotRequest
@@ -72,20 +73,31 @@ def create_server(dataset_path: Path, *, enable_customer_snapshots: bool = False
     if enable_customer_snapshots:
 
         @mcp.tool
-        def get_customer_snapshot(customer_id: str) -> dict[str, Any]:
-            """Get an allowlisted operational snapshot for an already-known customer ID."""
+        def get_customer_snapshot(
+            customer_id: str,
+            fields: list[CustomerSnapshotField] | None = None,
+        ) -> dict[str, Any]:
+            """Get selected safe fields for an already-known customer ID."""
+
             def operation() -> dict[str, Any]:
                 try:
-                    request = CustomerSnapshotRequest(customer_id=customer_id)
+                    arguments: dict[str, Any] = {"customer_id": customer_id}
+                    if fields is not None:
+                        arguments["fields"] = fields
+                    request = CustomerSnapshotRequest(**arguments)
                 except ValidationError as error:
                     raise ToolError(
-                        "INVALID_ARGUMENT: customer_id must contain only letters, numbers, "
-                        "and hyphens."
+                        "INVALID_ARGUMENT: use a valid customer_id and one or more allowlisted "
+                        "snapshot fields."
                     ) from error
                 return profiles.get_snapshot(request).model_dump(mode="json")
 
             try:
-                return audit.run("get_customer_snapshot", {"customer_id": customer_id}, operation)
+                return audit.run(
+                    "get_customer_snapshot",
+                    {"customer_id": customer_id, "fields": fields or []},
+                    operation,
+                )
             except CustomerNotFoundError as error:
                 raise ToolError(
                     "NOT_FOUND: no matching customer exists in the local snapshot."

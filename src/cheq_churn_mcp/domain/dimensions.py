@@ -13,6 +13,7 @@ class DimensionDefinition:
 
 DIMENSIONS: dict[str, DimensionDefinition] = {
     "contract": DimensionDefinition("contract", "Contract"),
+    "country": DimensionDefinition("country", "Country"),
     "internet_type": DimensionDefinition("internet_type", "Internet type"),
     "payment_method": DimensionDefinition("payment_method", "Payment method"),
     "churn_category": DimensionDefinition("churn_category", "Churn category"),
