@@ -1,24 +1,24 @@
 # CHEQ Churn Insights MCP
 
-A local MCP server for asking safe, repeatable questions about the Telco Customer
-Churn dataset from Codex or Claude Code.
+A local MCP server for asking questions about the Telco Customer Churn dataset
+from Codex or Claude Code.
 
-It has two modes:
+- `cheq-churn` is the regular, aggregate-only server. It answers counts, churn
+  rates, averages, and comparisons. It never returns customer IDs.
+- `cheq-churn-trusted` is a local demo of privileged lookup workflows. It can
+  discover up to 10 IDs and return selected customer fields. It is **not real
+  RBAC**: any local user who can edit the MCP configuration can enable it.
 
-| Server | Use it for | Customer IDs |
-| --- | --- | --- |
-| `cheq-churn` | Normal aggregate questions: counts, churn rates, averages, and comparisons | Never exposed |
-| `cheq-churn-trusted` | A local demonstration of privileged customer lookup workflows | Can discover up to 10 IDs and look up selected fields |
+## Follow these steps to talk to the MCP
 
-`cheq-churn-trusted` is a deliberately named local demo switch, **not real RBAC**.
-Anyone who can edit the local MCP configuration can enable it. Use the regular
-server by default.
+### 1. Clone the repository
 
-## Run it in four steps
+```bash
+git clone https://github.com/Nirerp/cheq-churn-mcp.git
+cd cheq-churn-mcp
+```
 
-### 1. Install dependencies and download the dataset
-
-Run these once after cloning:
+### 2. Install dependencies and download the dataset
 
 ```bash
 uv sync --all-groups
@@ -26,29 +26,9 @@ make bootstrap
 ```
 
 `make bootstrap` downloads the pinned 7,043-row dataset into the ignored
-`data/` directory. The source dataset is intentionally not committed to Git.
+`data/` directory. It is not committed to Git.
 
-### 2. Start it directly (optional smoke test)
-
-Use this when you want to check that the server starts in a terminal:
-
-```bash
-# Regular, aggregate-only server
-uv run cheq-churn-mcp
-
-# Trusted local demo
-CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
-```
-
-The process will look idle after it starts. That is expected: an STDIO MCP
-server waits for an MCP client to send it messages. Press `Ctrl+C` to stop it.
-
-For a smoke test that also runs the checks first, use `make demo` or
-`make demo-trusted`.
-
-### 3. Connect it to Codex or Claude Code
-
-Choose **one** of the following registrations, then restart the client.
+### 3. Choose the MCP mode and register it with your client
 
 #### Regular server (recommended)
 
@@ -60,8 +40,6 @@ make install-codex
 make install-claude-code
 ```
 
-The registered MCP name is `cheq-churn`.
-
 #### Trusted local demo
 
 ```bash
@@ -72,61 +50,63 @@ make install-codex-trusted
 make install-claude-code-trusted
 ```
 
-The registered MCP name is `cheq-churn-trusted`. It adds `find_customer_ids`
-and `get_customer_snapshot` to the regular tools.
+These commands register an STDIO server and tell the client how to start it.
+They do not start a long-running service in your terminal.
 
-### 4. Check the registration and ask a question
+### 4. Restart Codex or Claude Code
+
+The newly registered MCP tools are loaded when the client starts.
+
+### 5. Confirm the registration
 
 ```bash
-# Codex
+# Regular server
 codex mcp get cheq-churn
+# or: claude mcp get cheq-churn
 
-# Claude Code
-claude mcp get cheq-churn
+# Trusted demo
+codex mcp get cheq-churn-trusted
+# or: claude mcp get cheq-churn-trusted
 ```
 
-Then ask, for example:
+### 6. Ask a question
+
+Regular server examples:
 
 - “What percentage of customers churned?”
 - “Which contract has the highest churn rate?”
 - “How many churned customers said they don't know why?”
 
-For the trusted demo only:
+Trusted-demo example:
 
 - “Using only `cheq-churn-trusted`, give me one customer ID for a customer who
   churned for an unclear reason.”
 
-## Remove a local registration
+## Optional: run the server directly in a terminal
+
+This is only a smoke test. It is **not** part of the Codex/Claude Code setup.
 
 ```bash
 # Regular server
-make remove-codex
-make remove-claude-code
+uv run cheq-churn-mcp
 
-# Trusted demo
-make remove-codex-trusted
-make remove-claude-code-trusted
+# Trusted local demo
+CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
 ```
 
-## Manual configuration
+The process will appear idle because it is waiting for STDIO MCP messages.
+Press `Ctrl+C` when you are done. Do not leave this process running and expect
+`make install-codex` or `make install-claude-code` to attach to it: an STDIO
+client launches its own MCP process.
 
-The Make targets are the simplest option. If you need to add the MCP manually,
-run one of these commands to print a ready-to-paste configuration using this
-clone's absolute path:
+For a smoke test that runs the repository checks before starting the server, use
+`make demo` or `make demo-trusted`.
 
-```bash
-make print-mcp-config
-make print-mcp-config-trusted
-```
+## Docker: what it does and does not do
 
-The output contains both the Codex TOML entry and the Claude Code JSON entry.
-This server uses STDIO, so there is no hostname, port, or `0.0.0.0` address.
-
-## Optional Docker runtime
-
-Docker is **not** needed for the normal local path above. It packages the same
-MCP process into a reproducible image; DuckDB runs inside that process, so
-there is no database container or Docker Compose stack.
+Docker is optional. It packages the same MCP process into an image; DuckDB runs
+inside that process, so there is no database container, network port, or Docker
+Compose stack.
 
 ```bash
 make bootstrap
@@ -144,19 +124,37 @@ docker run --interactive --rm \
   cheq-churn-mcp:local
 ```
 
-These Docker commands **only start the MCP process**. They do **not** register
-or connect it to Codex or Claude Code, so the container will wait on standard
-input and appear idle. The `make install-*` commands intentionally use `uv`;
-they are the recommended way to connect this local project to either client.
+Those commands **only start an MCP process in a container**. They do not connect
+it to Codex or Claude Code, and the container will wait on standard input.
 
-To use the Docker image with a client, configure that client to launch the
-equivalent `docker run --interactive --rm ...` command as its STDIO MCP
-command, including an absolute read-only mount for this clone's `data/`
-directory. No network port is required.
+If your goal is simply to use the MCP with Codex or Claude Code, use the
+`make install-*` command in step 3. It connects the client by having it launch
+the `uv` version of the server. Do **not** start a Docker container and then run
+`make install-codex` expecting Codex to attach to that container; STDIO does not
+work that way.
 
-## What the MCP can and cannot do
+To make a client launch the Docker image instead, add a manual STDIO MCP entry
+whose command is `docker run --interactive --rm ...`, with an absolute,
+read-only mount of this clone's `data/` directory. No port is required.
 
-The regular server exposes three tools:
+## Remove a local registration
+
+```bash
+# Regular server
+make remove-codex
+make remove-claude-code
+
+# Trusted demo
+make remove-codex-trusted
+make remove-claude-code-trusted
+```
+
+## Manual configuration and supported tools
+
+Run `make print-mcp-config` or `make print-mcp-config-trusted` to print
+ready-to-paste Codex and Claude Code configuration for the `uv` runtime.
+
+The regular server exposes:
 
 - `describe_dataset` — supported fields, metric definitions, source version,
   and limitations.
@@ -164,12 +162,9 @@ The regular server exposes three tools:
 - `data_quality_summary` — row count, uniqueness, and core completeness checks.
 
 It rejects raw SQL and unsupported metrics, filters, or groupings with an
-actionable `INVALID_ARGUMENT` error. An empty aggregate is returned as an empty
-result, not an error. The regular server cannot discover customer IDs or return
-individual customer records.
-
-Every aggregate response includes the pinned dataset revision and applied
-filters. Small grouped results are suppressed below five customers.
+actionable `INVALID_ARGUMENT` error. Empty aggregate results are valid and
+return an empty result. Small grouped results are suppressed below five
+customers.
 
 ## Verify repository checks
 
