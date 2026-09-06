@@ -28,7 +28,23 @@ make bootstrap
 `make bootstrap` downloads the pinned 7,043-row dataset into the ignored
 `data/` directory. It is not committed to Git.
 
-### 3. Choose the MCP mode and register it with your client
+### 3. Run FastMCP
+
+In a terminal, start the mode you want to test:
+
+```bash
+# Regular server
+uv run cheq-churn-mcp
+
+# Trusted local demo
+CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
+```
+
+The server will look idle because it is waiting for STDIO MCP messages. That
+confirms FastMCP started correctly. Press `Ctrl+C` to stop it before the next
+step: Codex and Claude Code start their own STDIO process.
+
+### 4. Register the MCP with Codex or Claude Code
 
 #### Regular server (recommended)
 
@@ -53,21 +69,9 @@ make install-claude-code-trusted
 These commands register an STDIO server and tell the client how to start it.
 They do not start a long-running service in your terminal.
 
-### 4. Restart Codex or Claude Code
+### 5. Restart Codex or Claude Code
 
 The newly registered MCP tools are loaded when the client starts.
-
-### 5. Confirm the registration
-
-```bash
-# Regular server
-codex mcp get cheq-churn
-# or: claude mcp get cheq-churn
-
-# Trusted demo
-codex mcp get cheq-churn-trusted
-# or: claude mcp get cheq-churn-trusted
-```
 
 ### 6. Ask a question
 
@@ -81,26 +85,6 @@ Trusted-demo example:
 
 - “Using only `cheq-churn-trusted`, give me one customer ID for a customer who
   churned for an unclear reason.”
-
-## Optional: run the server directly in a terminal
-
-This is only a smoke test. It is **not** part of the Codex/Claude Code setup.
-
-```bash
-# Regular server
-uv run cheq-churn-mcp
-
-# Trusted local demo
-CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1 uv run cheq-churn-mcp
-```
-
-The process will appear idle because it is waiting for STDIO MCP messages.
-Press `Ctrl+C` when you are done. Do not leave this process running and expect
-`make install-codex` or `make install-claude-code` to attach to it: an STDIO
-client launches its own MCP process.
-
-For a smoke test that runs the repository checks before starting the server, use
-`make demo` or `make demo-trusted`.
 
 ## Docker: what it does and does not do
 
@@ -128,7 +112,7 @@ Those commands **only start an MCP process in a container**. They do not connect
 it to Codex or Claude Code, and the container will wait on standard input.
 
 If your goal is simply to use the MCP with Codex or Claude Code, use the
-`make install-*` command in step 3. It connects the client by having it launch
+`make install-*` command in step 4. It connects the client by having it launch
 the `uv` version of the server. Do **not** start a Docker container and then run
 `make install-codex` expecting Codex to attach to that container; STDIO does not
 work that way.
