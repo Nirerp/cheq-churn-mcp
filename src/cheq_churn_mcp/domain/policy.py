@@ -5,6 +5,16 @@ from typing import Literal
 MINIMUM_AGGREGATE_GROUP_SIZE = 5
 TRUSTED_DEMO_SNAPSHOT_ENV_VAR = "CHEQ_ENABLE_SNAPSHOT_LOOKUPS"
 
+DiscoveryPurpose = Literal[
+    "churn_investigation",
+    "customer_support",
+    "data_quality",
+    "security_investigation",
+]
+ALLOWED_DISCOVERY_PURPOSES = frozenset(
+    {"churn_investigation", "customer_support", "data_quality", "security_investigation"}
+)
+
 # A local stdio MCP server has no trustworthy caller identity. These fields are
 # deliberately omitted from the snapshot tool until an authenticated production
 # policy layer is supplied.

@@ -25,7 +25,7 @@ class CompiledAnalyticsQuery:
     suppression_parameters: tuple[Any, ...] = ()
 
 
-def _where_clause(filters: CustomerFilters) -> tuple[str, list[Any]]:
+def compile_filter_clause(filters: CustomerFilters) -> tuple[str, list[Any]]:
     fragments: list[str] = []
     parameters: list[Any] = []
     values = filters.model_dump(exclude_none=True)
@@ -78,7 +78,7 @@ def _append_range(
 def compile_analytics_query(request: AnalyzeCustomersRequest) -> CompiledAnalyticsQuery:
     """Compile an allowlisted request without accepting client-provided SQL."""
     metric = METRICS[request.metric]
-    where_sql, parameters = _where_clause(request.filters)
+    where_sql, parameters = compile_filter_clause(request.filters)
     group_columns = [DIMENSIONS[name].column for name in request.group_by]
     select_parts = [
         *group_columns,

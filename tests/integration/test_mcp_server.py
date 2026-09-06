@@ -26,6 +26,7 @@ async def test_server_exposes_typed_tools_and_returns_structured_content(
         "analyze_customers",
         "data_quality_summary",
         "describe_dataset",
+        "find_customer_ids",
         "get_customer_snapshot",
     }
     assert result.is_error is False
@@ -54,9 +55,33 @@ async def test_server_defaults_to_aggregate_only_tools(customer_csv: Path) -> No
 
 
 @pytest.mark.asyncio
+async def test_trusted_server_discovers_bounded_ids_with_purpose(customer_csv: Path) -> None:
+    async with Client(create_server(customer_csv, enable_customer_snapshots=True)) as client:
+        result = await client.call_tool(
+            "find_customer_ids",
+            {
+                "filters": {"churn": 1, "reason_intent": "unclear_reason"},
+                "purpose": "churn_investigation",
+                "limit": 1,
+            },
+        )
+        description = await client.call_tool("describe_dataset")
+
+    assert result.data["customer_ids"] == ["0001-AAAAA"]
+    assert result.data["returned_count"] == 1
+    assert result.data["more_available"] is False
+    assert "find_customer_ids" in description.data["identifier_policy"]
+
+
+@pytest.mark.asyncio
 async def test_server_returns_safe_actionable_errors(customer_csv: Path) -> None:
     async with Client(create_server(customer_csv, enable_customer_snapshots=True)) as client:
         with pytest.raises(ToolError, match="INVALID_ARGUMENT"):
             await client.call_tool("analyze_customers", {"metric": "freeform_sql"})
+        with pytest.raises(ToolError, match="at least one customer filter"):
+            await client.call_tool(
+                "find_customer_ids",
+                {"filters": {}, "purpose": "churn_investigation"},
+            )
         with pytest.raises(ToolError, match="NOT_FOUND"):
             await client.call_tool("get_customer_snapshot", {"customer_id": "9999-NOTFOUND"})

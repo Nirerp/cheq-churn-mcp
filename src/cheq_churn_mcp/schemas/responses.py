@@ -32,3 +32,13 @@ class CustomerSnapshotResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     customer: dict[str, Any] | None
     provenance: Provenance
+
+
+class CustomerIdDiscoveryResponse(BaseModel):
+    """Bounded identifiers returned only by the trusted local demo surface."""
+
+    model_config = ConfigDict(extra="forbid")
+    customer_ids: list[str]
+    returned_count: int
+    more_available: bool
+    provenance: Provenance

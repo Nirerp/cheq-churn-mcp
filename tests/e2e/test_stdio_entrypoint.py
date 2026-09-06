@@ -50,9 +50,17 @@ async def test_console_entrypoint_exposes_snapshots_only_in_trusted_demo_mode(
 
     async with Client(transport) as client:
         tools = await client.list_tools()
-        result = await client.call_tool(
-            "get_customer_snapshot", {"customer_id": "0001-AAAAA"}
+        snapshot = await client.call_tool("get_customer_snapshot", {"customer_id": "0001-AAAAA"})
+        discovery = await client.call_tool(
+            "find_customer_ids",
+            {
+                "filters": {"churn": 1},
+                "purpose": "churn_investigation",
+                "limit": 1,
+            },
         )
 
     assert "get_customer_snapshot" in {tool.name for tool in tools}
-    assert "customer_id" not in result.data["customer"]
+    assert "find_customer_ids" in {tool.name for tool in tools}
+    assert "customer_id" not in snapshot.data["customer"]
+    assert discovery.data["customer_ids"] == ["0001-AAAAA"]
