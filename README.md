@@ -78,7 +78,12 @@ First clone the repository and run `uv sync --all-groups`. The data bootstrap
 is deliberately local: the dataset is ignored by Git and must be materialized
 on each machine before the server starts.
 
-### Codex
+### Standard aggregate-only mode
+
+This is the normal configuration. It exposes only aggregate tools and cannot
+look up or discover customer IDs.
+
+#### Codex with the Makefile
 
 Install the server for the current clone with:
 
@@ -88,17 +93,7 @@ make install-codex
 
 It refuses to overwrite an existing `cheq-churn` configuration. To inspect the
 registered server, run `codex mcp get cheq-churn`; restart Codex afterward.
-Alternatively, `make print-mcp-config` prints a ready-to-paste table with this
-clone's absolute path. Codex supports local stdio servers in `config.toml`
-through an `[mcp_servers.<name>]` table.
-
-When the demo is over, remove only this server entry with:
-
-```bash
-make remove-codex
-```
-
-### Claude Code
+#### Claude Code with the Makefile
 
 With the Claude Code CLI installed, register the same local server with:
 
@@ -106,13 +101,133 @@ With the Claude Code CLI installed, register the same local server with:
 make install-claude-code
 ```
 
-This uses Claude Code's `claude mcp add` command. `make print-mcp-config` also
-prints a JSON entry that can be adapted for other MCP clients.
+This uses Claude Code's `claude mcp add` command.
 
-Remove the same server later with:
+#### Manual Codex configuration
+
+This server is local stdio, not an HTTP service. Add the following to
+`~/.codex/config.toml`, or to `.codex/config.toml` in a trusted clone, and
+replace the placeholder with the clone's absolute path:
+
+```toml
+[mcp_servers.cheq-churn]
+command = "uv"
+args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]
+```
+
+Restart Codex after saving. There is no `0.0.0.0:port` address in this local
+configuration because Codex starts the process and communicates over stdin and
+stdout.
+
+#### Manual Claude Code configuration
+
+Create `.mcp.json` in the clone root, or add this server entry to an existing
+`.mcp.json` file:
+
+```json
+{
+  "mcpServers": {
+    "cheq-churn": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/ABSOLUTE/PATH/TO/cheq-churn-mcp",
+        "cheq-churn-mcp"
+      ]
+    }
+  }
+}
+```
+
+Alternatively, run `make print-mcp-config` to generate both ready-to-paste
+entries for this clone. Claude Code requires approval before using a
+project-scoped server from `.mcp.json`.
+
+When the demo is over, remove only this server entry with:
+
+```bash
+make remove-codex
+```
+
+For Claude Code, run:
 
 ```bash
 make remove-claude-code
+```
+
+### Trusted local demonstration: known customer-ID lookups
+
+This is not an "admin" mode and not RBAC. A local stdio process has no trusted
+caller identity. It is a deliberately separate, opt-in demonstration mode for
+an ID the caller already knows. The default `cheq-churn` server remains
+aggregate-only.
+
+#### Codex or Claude Code with the Makefile
+
+Register a separately named trusted-demo server:
+
+```bash
+make install-codex-trusted
+# or
+make install-claude-code-trusted
+```
+
+Restart the client, then ask for the allowlisted operational snapshot of a
+known customer ID. A valid-looking ID that is not in the dataset returns
+`NOT_FOUND`; a malformed ID returns `INVALID_ARGUMENT`. Remove the server when
+the demonstration ends:
+
+```bash
+make remove-codex-trusted
+# or
+make remove-claude-code-trusted
+```
+
+#### Manual trusted-demo configuration
+
+The only difference from the standard configuration is the environment
+variable `CHEQ_ENABLE_SNAPSHOT_LOOKUPS=1`. For Codex, add a separately named
+entry to `config.toml`:
+
+```toml
+[mcp_servers.cheq-churn-trusted]
+command = "uv"
+args = ["run", "--directory", "/ABSOLUTE/PATH/TO/cheq-churn-mcp", "cheq-churn-mcp"]
+
+[mcp_servers.cheq-churn-trusted.env]
+CHEQ_ENABLE_SNAPSHOT_LOOKUPS = "1"
+```
+
+For Claude Code, add this entry under `mcpServers` in `.mcp.json`:
+
+```json
+{
+  "cheq-churn-trusted": {
+    "type": "stdio",
+    "command": "uv",
+    "args": [
+      "run",
+      "--directory",
+      "/ABSOLUTE/PATH/TO/cheq-churn-mcp",
+      "cheq-churn-mcp"
+    ],
+    "env": {
+      "CHEQ_ENABLE_SNAPSHOT_LOOKUPS": "1"
+    }
+  }
+}
+```
+
+Alternatively, run `make print-mcp-config-trusted` for ready-to-paste Codex
+TOML and Claude Code JSON. Keep the server name `cheq-churn-trusted` so its
+elevated local-demo behavior is visible during testing.
+
+For a standalone terminal process rather than a configured MCP client, run:
+
+```bash
+make demo-trusted
 ```
 
 ## Example business prompts
